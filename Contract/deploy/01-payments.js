@@ -1,12 +1,12 @@
 const { network } = require("hardhat");
-const { localNetworks } = require("../helper-hardhat.config");
+const { localNetworks, networks } = require("../helper-hardhat.config");
 const verfiy = require("../scripts/verfiy");
 
 module.exports = async ({ getNamedAccounts, deployments }) => {
   const { deployer } = await getNamedAccounts();
 
   const { log, deploy } = deployments;
-  const args = [deployer, 10];
+  const args = [deployer, networks[network.config.chainId].interval];
 
   const contract = await deploy("AutomatedPayment", {
     from: deployer,
@@ -21,3 +21,5 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     await verfiy(contract.address, args);
   }
 };
+
+module.exports.tags = ["contract"];

@@ -7,20 +7,25 @@ error AutomatedPayment__NotFound();
 error AutomatedPayment__OnlyOwnerAllowed();
 error AutomatedPayment__NotEnoughFunds();
 error AutomatedPayment__NotEnoughTimePassed();
+error AutomatedPayment__CannotPerformUpkeep();
 
 contract AutomatedPayment is KeeperCompatibleInterface {
     uint256 public immutable i_interval;
     uint256 public startTime;
-    address immutable i_owner;
+    address public immutable i_owner;
     address payable[] public employees;
     address[] public funders;
-    mapping(address => uint256) public coorespondingEmployeeSalary;
+    mapping(address => uint256) coorespondingEmployeeSalary;
     mapping(address => uint256) public coorespondingFunderAmount;
 
     constructor(address owner, uint256 interval) {
         i_owner = owner;
         i_interval = interval;
         startTime = block.timestamp;
+    }
+
+    receive() external payable {
+        fund();
     }
 
     function fund() public payable {
@@ -46,7 +51,9 @@ contract AutomatedPayment is KeeperCompatibleInterface {
 
     function deleteEmployee(address employee) public onlyOwner {
         uint256 index = isEmployee(employee);
-        delete employees[index];
+        employees[index] = employees[employees.length - 1];
+        employees.pop();
+
         delete coorespondingEmployeeSalary[employee];
     }
 
@@ -72,17 +79,17 @@ contract AutomatedPayment is KeeperCompatibleInterface {
         )
     {
         bool timePassed = (block.timestamp - startTime) > i_interval;
-        bool isOwner = (msg.sender == i_owner);
         bool enoughFunds = (address(this).balance >= getTotalSalariesAmount());
-        upKeepNeeded = (timePassed && isOwner && enoughFunds);
+        bool employeeExist = employees.length >= 1;
+        upKeepNeeded = (timePassed && enoughFunds && employeeExist);
     }
 
     function performUpkeep(
-        bytes calldata /*performData*/
+        bytes memory /*performData*/
     ) external override {
         (bool upkeepNeeded, ) = checkUpkeep("");
         if (!upkeepNeeded) {
-            revert AutomatedPayment__NotEnoughTimePassed();
+            revert AutomatedPayment__CannotPerformUpkeep();
         }
         for (uint256 i = 0; i < employees.length; i++) {
             employees[i].transfer(coorespondingEmployeeSalary[employees[i]]);
@@ -92,6 +99,10 @@ contract AutomatedPayment is KeeperCompatibleInterface {
 
     function getBalance() public view returns (uint256) {
         return address(this).balance;
+    }
+
+    function getOwner() public view returns (address) {
+        return i_owner;
     }
 
     function getFunders() public view returns (address[] memory) {
@@ -123,6 +134,10 @@ contract AutomatedPayment is KeeperCompatibleInterface {
         }
 
         return totalAmount;
+    }
+
+    function getInterval() public view returns (uint256) {
+        return i_interval;
     }
 
     modifier areEnoughFundsAvailable() {
