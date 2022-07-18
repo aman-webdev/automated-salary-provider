@@ -15,6 +15,7 @@ contract AutomatedPayment is KeeperCompatibleInterface {
     address public immutable i_owner;
     address payable[] public employees;
     address[] public funders;
+
     mapping(address => uint256) coorespondingEmployeeSalary;
     mapping(address => uint256) public coorespondingFunderAmount;
 
@@ -109,21 +110,11 @@ contract AutomatedPayment is KeeperCompatibleInterface {
         return funders;
     }
 
-    function getEmployees()
-        public
-        view
-        onlyOwner
-        returns (address payable[] memory)
-    {
+    function getEmployees() public view returns (address payable[] memory) {
         return employees;
     }
 
-    function getEmployeeSalary(address employee)
-        public
-        view
-        onlyOwner
-        returns (uint256)
-    {
+    function getEmployeeSalary(address employee) public view returns (uint256) {
         return coorespondingEmployeeSalary[employee];
     }
 
