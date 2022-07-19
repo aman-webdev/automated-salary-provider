@@ -6,7 +6,8 @@ const convertToWei = require("../../scripts/convertToWei");
 !localNetworks.includes(network.name)
   ? describe.skip
   : describe("Automated Payment", () => {
-      let automatedPayment,
+      let automatedFactory,
+        automatedPayment,
         deployer,
         funderOne,
         funderTwo,
@@ -17,7 +18,7 @@ const convertToWei = require("../../scripts/convertToWei");
       const fundAmount = ethers.utils.parseEther("1");
 
       beforeEach(async () => {
-        await deployments.fixture(["contract"]);
+        await deployments.fixture(["automatedPayment"]);
         automatedPayment = await ethers.getContract(
           "AutomatedPayment",
           deployer

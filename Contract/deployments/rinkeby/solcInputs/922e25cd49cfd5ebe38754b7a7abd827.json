@@ -1,0 +1,41 @@
+{
+  "language": "Solidity",
+  "sources": {
+    "contracts/AutometaFactory.sol": {
+      "content": "// SPDX-License-Identifier: MIT\r\npragma solidity ^0.8.8;\r\nimport \"./AutomatedPayment.sol\";\r\n\r\ncontract Autometa {\r\n    mapping(address => AutomatedPayment) public deployments;\r\n\r\n    function deployContract(uint256 interval) external returns (address) {\r\n        AutomatedPayment t = new AutomatedPayment(msg.sender, interval);\r\n        deployments[msg.sender] = (t);\r\n        return address(t);\r\n    }\r\n}\r\n"
+    },
+    "contracts/AutomatedPayment.sol": {
+      "content": "// SPDX-License-Identifier: MIT\r\npragma solidity ^0.8.8;\r\n\r\nimport \"@chainlink/contracts/src/v0.8/interfaces/KeeperCompatibleInterface.sol\";\r\n\r\nerror AutomatedPayment__NotFound();\r\nerror AutomatedPayment__OnlyOwnerAllowed();\r\nerror AutomatedPayment__NotEnoughFunds();\r\nerror AutomatedPayment__NotEnoughTimePassed();\r\nerror AutomatedPayment__CannotPerformUpkeep();\r\n\r\ncontract AutomatedPayment is KeeperCompatibleInterface {\r\n    uint256 public immutable i_interval;\r\n    uint256 public startTime;\r\n    address public immutable i_owner;\r\n    address payable[] public employees;\r\n    address[] public funders;\r\n\r\n    mapping(address => uint256) coorespondingEmployeeSalary;\r\n    mapping(address => uint256) public coorespondingFunderAmount;\r\n\r\n    constructor(address owner, uint256 interval) {\r\n        i_owner = owner;\r\n        i_interval = interval;\r\n        startTime = block.timestamp;\r\n    }\r\n\r\n    receive() external payable {\r\n        fund();\r\n    }\r\n\r\n    function fund() public payable {\r\n        funders.push(msg.sender);\r\n        coorespondingFunderAmount[msg.sender] += msg.value;\r\n    }\r\n\r\n    function addEmployee(address payable employee, uint256 salary)\r\n        public\r\n        onlyOwner\r\n    {\r\n        employees.push(employee);\r\n        coorespondingEmployeeSalary[employee] = salary;\r\n    }\r\n\r\n    function updateEmployeeSalary(address employee, uint256 salary)\r\n        public\r\n        onlyOwner\r\n    {\r\n        uint256 index = isEmployee(employee);\r\n        coorespondingEmployeeSalary[employee] = salary;\r\n    }\r\n\r\n    function deleteEmployee(address employee) public onlyOwner {\r\n        uint256 index = isEmployee(employee);\r\n        employees[index] = employees[employees.length - 1];\r\n        employees.pop();\r\n\r\n        delete coorespondingEmployeeSalary[employee];\r\n    }\r\n\r\n    function isEmployee(address employee) public view returns (uint256) {\r\n        for (uint256 i = 0; i < employees.length; i++) {\r\n            if (employees[i] == employee) {\r\n                return i;\r\n            }\r\n        }\r\n\r\n        revert AutomatedPayment__NotFound();\r\n    }\r\n\r\n    function checkUpkeep(\r\n        bytes memory /*checkData*/\r\n    )\r\n        public\r\n        view\r\n        override\r\n        returns (\r\n            bool upKeepNeeded,\r\n            bytes memory /* performData*/\r\n        )\r\n    {\r\n        bool timePassed = (block.timestamp - startTime) > i_interval;\r\n        bool enoughFunds = (address(this).balance >= getTotalSalariesAmount());\r\n        bool employeeExist = employees.length >= 1;\r\n        upKeepNeeded = (timePassed && enoughFunds && employeeExist);\r\n    }\r\n\r\n    function performUpkeep(\r\n        bytes memory /*performData*/\r\n    ) external override {\r\n        (bool upkeepNeeded, ) = checkUpkeep(\"\");\r\n        if (!upkeepNeeded) {\r\n            revert AutomatedPayment__CannotPerformUpkeep();\r\n        }\r\n        for (uint256 i = 0; i < employees.length; i++) {\r\n            employees[i].transfer(coorespondingEmployeeSalary[employees[i]]);\r\n        }\r\n        startTime = block.timestamp;\r\n    }\r\n\r\n    function getBalance() public view returns (uint256) {\r\n        return address(this).balance;\r\n    }\r\n\r\n    function getOwner() public view returns (address) {\r\n        return i_owner;\r\n    }\r\n\r\n    function getFunders() public view returns (address[] memory) {\r\n        return funders;\r\n    }\r\n\r\n    function getEmployees() public view returns (address payable[] memory) {\r\n        return employees;\r\n    }\r\n\r\n    function getEmployeeSalary(address employee) public view returns (uint256) {\r\n        return coorespondingEmployeeSalary[employee];\r\n    }\r\n\r\n    function getTotalSalariesAmount() internal view returns (uint256) {\r\n        uint256 totalAmount;\r\n        for (uint256 i = 0; i < employees.length; i++) {\r\n            totalAmount += coorespondingEmployeeSalary[employees[i]];\r\n        }\r\n\r\n        return totalAmount;\r\n    }\r\n\r\n    function getInterval() public view returns (uint256) {\r\n        return i_interval;\r\n    }\r\n\r\n    modifier areEnoughFundsAvailable() {\r\n        uint256 totalAmount = getTotalSalariesAmount();\r\n        if (totalAmount > address(this).balance)\r\n            revert AutomatedPayment__NotEnoughFunds();\r\n        _;\r\n    }\r\n\r\n    modifier onlyOwner() {\r\n        if (i_owner != msg.sender) revert AutomatedPayment__OnlyOwnerAllowed();\r\n        _;\r\n    }\r\n}\r\n"
+    },
+    "@chainlink/contracts/src/v0.8/interfaces/KeeperCompatibleInterface.sol": {
+      "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface KeeperCompatibleInterface {\n  /**\n   * @notice method that is simulated by the keepers to see if any work actually\n   * needs to be performed. This method does does not actually need to be\n   * executable, and since it is only ever simulated it can consume lots of gas.\n   * @dev To ensure that it is never called, you may want to add the\n   * cannotExecute modifier from KeeperBase to your implementation of this\n   * method.\n   * @param checkData specified in the upkeep registration so it is always the\n   * same for a registered upkeep. This can easily be broken down into specific\n   * arguments using `abi.decode`, so multiple upkeeps can be registered on the\n   * same contract and easily differentiated by the contract.\n   * @return upkeepNeeded boolean to indicate whether the keeper should call\n   * performUpkeep or not.\n   * @return performData bytes that the keeper should call performUpkeep with, if\n   * upkeep is needed. If you would like to encode data to decode later, try\n   * `abi.encode`.\n   */\n  function checkUpkeep(bytes calldata checkData) external returns (bool upkeepNeeded, bytes memory performData);\n\n  /**\n   * @notice method that is actually executed by the keepers, via the registry.\n   * The data returned by the checkUpkeep simulation will be passed into\n   * this method to actually be executed.\n   * @dev The input to this method should not be trusted, and the caller of the\n   * method should not even be restricted to any single registry. Anyone should\n   * be able call it, and the input should be validated, there is no guarantee\n   * that the data passed in is the performData returned from checkUpkeep. This\n   * could happen due to malicious keepers, racing keepers, or simply a state\n   * change while the performUpkeep transaction is waiting for confirmation.\n   * Always validate the data passed in.\n   * @param performData is the data which was passed back from the checkData\n   * simulation. If it is encoded, it can easily be decoded into other types by\n   * calling `abi.decode`. This data should not be trusted, and should be\n   * validated against the contract's current state.\n   */\n  function performUpkeep(bytes calldata performData) external;\n}\n"
+    }
+  },
+  "settings": {
+    "optimizer": {
+      "enabled": false,
+      "runs": 200
+    },
+    "outputSelection": {
+      "*": {
+        "*": [
+          "abi",
+          "evm.bytecode",
+          "evm.deployedBytecode",
+          "evm.methodIdentifiers",
+          "metadata",
+          "devdoc",
+          "userdoc",
+          "storageLayout",
+          "evm.gasEstimates"
+        ],
+        "": [
+          "ast"
+        ]
+      }
+    },
+    "metadata": {
+      "useLiteralContent": true
+    }
+  }
+}

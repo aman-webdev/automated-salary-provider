@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 const Hero = () => {
   const navigate = useNavigate();
   return (
-    <div className="bg-[#1f332c] text-[#f5fdfa] w-full py-4 h-5/6 pb-10">
+    <div className="bg-[#1f332c] text-[#f5fdfa] w-full py-4 h-5/6 pb-10 ">
       <div className="mx-auto w-5/6 flex items-center justify-between flex-col-reverse md:flex-row">
         <div className="md:w-3/5 w-full">
           <h1 className=" text-5xl font-OpenSans  text-white leading-[45px] font-semibold">
