@@ -1,3 +1,3 @@
 # automated-salary-provider
 
-Verified contract example https://rinkeby.etherscan.io/address/0x1494da7B8e33C25CDF0d380b3374a3054C644EF8
+![image](https://user-images.githubusercontent.com/78081991/179769001-4d957d36-2bc2-46da-a68f-67854373ca18.png)
